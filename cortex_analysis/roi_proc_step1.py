@@ -185,7 +185,7 @@ ival = [-1, 2]
 
 # saving path
 root_path = '/Users/federico/University/Magistrale/00.TESI/data_original/datasets/cortex'
-relative_path = os.path.join(mode, '_'+str(ival)[:-1])
+relative_path = mode + '_' + str(ival)[:-1]
 save_path = os.path.join(root_path, relative_path)
 
 # Print inversion infos
