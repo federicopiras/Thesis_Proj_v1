@@ -29,12 +29,12 @@ def del_invalid_labels(labels_, word_list_):
     """
     Removes unwanted labels and create df with ROI label name and ROI number of vertices
     """
-    labels_ = [label for label in labels_ if not any(word in label.name for word in word_list_)]
+    labels_ = [label_ for label_ in labels_ if not any(word in label_.name for word in word_list_)]
     labels_list = []
     vertex_list = []
-    for label in labels_:
-        labels_list.append(label.name)
-        vertex_list.append(len(label.vertices))
+    for label_ in labels_:
+        labels_list.append(label_.name)
+        vertex_list.append(len(label_.vertices))
     df_ = pd.DataFrame(list(zip(labels_list, vertex_list)), columns=['roi_names', 'roi_n_vertices'])
     return labels_, df_
 
@@ -108,7 +108,7 @@ def scouting(data_, mode_):
     :return: single time series, representative of the ROI
     """
 
-    valid_modes = ['mean', 'pca_sk', 'bst']
+    valid_modes = ['mean', 'pca_sk', 'pca_bst']
     if mode_ not in valid_modes:
         raise ValueError(f"Invalid mode. valid modes are: {valid_modes}")
 
@@ -178,7 +178,7 @@ pick_ori = 'vector'
 srate = 512
 
 # Scouting function
-mode = 'pca_sk'
+mode = 'pca_bst'
 
 # Interval
 ival = [-1, 2]
@@ -187,6 +187,7 @@ ival = [-1, 2]
 root_path = '/Users/federico/University/Magistrale/00.TESI/data_original/datasets/cortex'
 relative_path = mode + '_' + str(ival)[:-1]
 save_path = os.path.join(root_path, relative_path)
+print(f"relative_path:  {relative_path}")
 
 # Print inversion infos
 print("======================")
@@ -326,4 +327,3 @@ for sbj_f_path in sbj_paths:
 
     with open(os.path.join(save_path, file_name), 'wb') as handle:
         pickle.dump(epochs_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
