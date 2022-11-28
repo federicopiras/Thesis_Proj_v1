@@ -224,7 +224,7 @@ print("{:40} {}".format("srate", srate))
 # This is a function: y=(x+1), where x=t and y=t_out
 
 
-for sbj_f_path in sbj_paths:
+for sbj_f_path in sbj_paths[8:]:
 
     print('=======================================================================================')
     print(sbj_f_path)
