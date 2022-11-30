@@ -127,7 +127,10 @@ def scouting(data_, mode_):
 
     elif mode_ == 'pca_bst':
         data_ = data_.reshape(data_.shape[0] * data_.shape[1], data_.shape[2])
-        f_new_ = pca_bst(data_.astype(np.float32))
+        try:
+            f_new_ = pca_bst(data_.astype(np.float32))
+        except:
+            f_new_ = pca_bst(data_)
         f_new_ = f_new_[0, :]
 
     return f_new_
@@ -224,7 +227,7 @@ print("{:40} {}".format("srate", srate))
 # This is a function: y=(x+1), where x=t and y=t_out
 
 
-for sbj_f_path in sbj_paths[8:]:
+for sbj_f_path in sbj_paths[11:]:
 
     print('=======================================================================================')
     print(sbj_f_path)
@@ -262,7 +265,7 @@ for sbj_f_path in sbj_paths[8:]:
     # Allocate array for reconstruction
     tcs = np.zeros(shape=(run_labels.shape[0], len(labels), srate * (np.abs(ival[0]) + np.abs(ival[1]))))
 
-    for i in np.arange(len(epochs)):
+    for i in np.arange(len(epochs)) :
         epoch = epochs[i]
         # Down-sample logic
         if srate != 512:

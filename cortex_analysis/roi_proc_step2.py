@@ -17,7 +17,7 @@ import os
 import glob
 
 valid_modes = ['mean', 'pca_bst', 'pca_sk']
-mode = 'mean'
+mode = 'pca_sk'
 if mode not in valid_modes:
     raise ValueError(f"invalid mode for mode={mode}. mode should be one in {valid_modes}")
 
@@ -25,7 +25,11 @@ if mode not in valid_modes:
 # Relative path may differ
 relative_path = '/Users/federico/University/Magistrale/00.TESI/data_original/datasets/cortex'
 folder_path = glob.glob(os.path.join(relative_path, mode + '*'))[0]
-print(folder_path)
+plot_path = os.path.join(folder_path, 'plot')
+if not os.path.exists(plot_path):
+    os.makedirs(plot_path)
+print(f"folder_path: {folder_path}")
+print(f"plot_path: {plot_path}")
 file_paths = glob.glob(os.path.join(folder_path, '*.pkl'))
 file_paths = sorted(file_paths)
 
@@ -72,9 +76,9 @@ gstop = 40
 ord, wn = ellipord(wp, ws, gpass, gstop)
 b_hp, a_hp = ellip(ord, gpass, gstop, wn, btype='high')
 
-all_epochs_ = filtfilt(b_lp, a_lp, all_epochs_)
-all_epochs_ = filtfilt(b_hp, a_hp, all_epochs_)
 for j, epoch in enumerate(all_epochs_):
+    epoch = filtfilt(b_lp, a_lp, epoch)
+    epoch = filtfilt(b_hp, a_hp, epoch)
     baseline = np.mean(epoch[:, :512], axis=-1)
     baseline = baseline.reshape(all_epochs_.shape[1], 1)
     all_epochs_[j, :, :] = epoch - baseline
@@ -104,6 +108,7 @@ t = np.linspace(pre_time, post_time, epochs.shape[-1])
 left_roi_names = [left_roi_name for left_roi_name in roi_names if 'lh' in left_roi_name[-2:]]
 
 fig, axs = plt.subplots(nrows=6, ncols=6, figsize=(30, 30))
+fig.suptitle('ROI LH', fontsize=20, fontweight='bold')
 for roi, ax in zip(left_roi_names, axs.ravel()):
     idx_roi = roi_names.index(roi)
     for led in range(grand_average.shape[0]):
@@ -129,4 +134,40 @@ fig.delaxes(axs[-1, -1])
 fig.delaxes(axs[-1, -2])
 fig.tight_layout()
 fig.show()
+fig.savefig(os.path.join(plot_path, 'roi_lh.pdf'))
 
+# Plotting right hemisphere
+pre_time = ival[0]
+post_time = ival[1]
+t = np.linspace(pre_time, post_time, epochs.shape[-1])
+left_roi_names = [left_roi_name for left_roi_name in roi_names if 'rh' in left_roi_name[-2:]]
+
+fig, axs = plt.subplots(nrows=6, ncols=6, figsize=(30, 30))
+fig.suptitle('ROI LH', fontsize=20, fontweight='bold')
+
+for roi, ax in zip(left_roi_names, axs.ravel()):
+    idx_roi = roi_names.index(roi)
+    for led in range(grand_average.shape[0]):
+        ax.plot(t, grand_average[led, idx_roi, :], label='LED' + str(led + 1))
+    ax.set_title(roi)
+    ax.legend(prop={'size': 6})
+    ax.grid()
+    ax.set_ylim([fmin, fmax])
+    ax.set_xlim([t[0], t[-1]])
+
+    ## Cambio colore ai ticks che mi interessano
+    # ax.get_xticklabels()[1].set_color('red')
+    # ax.get_xticklabels()[3].set_color('red')
+    # ax.get_xticklabels()[0].set_color('red')
+    # ax.get_xticklabels()[-1].set_color('red')
+
+    # Aggiungo vertical lines
+    # ax.vlines(t[513], ymin=fmin, ymax=fmax, linestyles='--', linewidth=2)
+    # ax.vlines(t[1537], ymin=fmin, ymax=fmax, linestyles='--', linewidth=2)
+
+# Elimino gli ultimi 4 assi che sono in più.
+fig.delaxes(axs[-1, -1])
+fig.delaxes(axs[-1, -2])
+fig.tight_layout()
+fig.show()
+fig.savefig(os.path.join(plot_path, 'roi_rh.pdf'))
