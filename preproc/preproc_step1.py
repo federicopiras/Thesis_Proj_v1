@@ -1,13 +1,11 @@
 """
-DESCRIPTION
-
 First stage of preprocessing:
-* Filtering with a 0.5-50Hz elliptic bandpass filter
 * Detrend EEG data
+* Filtering with a 0.5-50Hz elliptic bandpass filter
 * Crop data to remove initial and final bad data segment
 * Apply ICA and save IC figures to a path
 
-IMPORTANT: path may differ for other users
+Paths may differ for other users
 """
 
 
@@ -59,6 +57,16 @@ def create_probab_df(raw, ica, fpath):
     df.to_csv(os.path.join(fpath, 'IC_to_remove.csv'), sep=',', index=False)
 
 
+def create_path(path):
+    """
+    A very simple function to create a non existing path
+    :param path: path to create
+    :return: nothing
+    """
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+
 def subplot_ica(ica, data, sfreq, psd, srate_in, time_duration, i, fpath):
     """
     Makes a plot of ICA signals on the scalp, in time and PSD
@@ -86,7 +94,7 @@ def subplot_ica(ica, data, sfreq, psd, srate_in, time_duration, i, fpath):
     fig = plt.figure(figsize=(40, 21))
 
     # First subplot: ICA component image
-    fig.add_subplot(2 ,2, 1)
+    fig.add_subplot(2, 2, 1)
     plt.imshow(im)
     plt.axis('off')
 
@@ -94,8 +102,8 @@ def subplot_ica(ica, data, sfreq, psd, srate_in, time_duration, i, fpath):
     ax = fig.add_subplot(2, 2, 2)
     ax.plot(sfreq, psd, 'k', linewidth=2.5)
     ax.set_xlim([0, 55])
-    ax.set_xlabel('frequency [Hz]', fontsize=15)
-    ax.set_ylabel('$µV^2$ / Hz', fontsize=15)
+    ax.set_xlabel('frequency [Hz]', fontsize=25)
+    ax.set_ylabel('$µV^2$ / Hz', fontsize=25)
     ax.grid()
 
     # Third subplot: First 100 seconds of IC in time
@@ -105,7 +113,7 @@ def subplot_ica(ica, data, sfreq, psd, srate_in, time_duration, i, fpath):
     ax.set_xlim([0, time_duration])
     ax.set_xlabel('time [s]', fontsize=15)
     ax.set_ylim([-25, 25])
-    ax.set_xticks(np.linspace(0,100,11))
+    ax.set_xticks(np.linspace(0, 100, 11))
     ax.set_yticks(np.linspace(-25, 25, 5))
     ax.grid(which='both')
 
@@ -122,15 +130,10 @@ root_folder = '/Users/federico/University/Magistrale/00.TESI/data_original'
 experiment_folders = sorted(glob.glob(os.path.join(root_folder, 'experiment*')))
 relative_path = os.path.join('ses-01', 'eeg')
 sbj_paths = []
-
 for experiment_folder in experiment_folders:
-    if os.path.basename(experiment_folder) == 'experiment1':
-        sbj_paths_ = sorted(glob.glob(os.path.join(experiment_folder, 'sub*')))[1:]
-    else:
-        sbj_paths_ = sorted(glob.glob(os.path.join(experiment_folder, 'sub*')))[1:]
-    sbj_paths.append(sbj_paths_)
-
-sbj_paths = [item for sublist in sbj_paths for item in sublist]
+    sbj_paths.extend(glob.glob(os.path.join(experiment_folder, 'sub*')))
+sbj_paths = sorted(sbj_paths)
+sbj_paths = [sbj_path for sbj_path in sbj_paths if not 'sub-001' in sbj_path]
 
 # Define filters
 # LP
@@ -159,7 +162,6 @@ for sbj_path in sbj_paths:
 
     # Bad channel for each run
     bad_channels_ = []
-
     # Container for the filtered and detrended runs
     conc_data_ = []
 
@@ -186,53 +188,23 @@ for sbj_path in sbj_paths:
         # Load raw, data, info. Dropping auricular and ocular channels.
         raw = mne.io.read_raw_eeglab(run_path)
         raw = raw.drop_channels(['A1', 'A2', 'F9', 'F10'])
-        data_ = raw.get_data()
+        data = raw.get_data()
         info = raw.info
 
         # Load event_csv:
         df = pd.read_csv(event_path)
 
-        # Conto i LED OR
+        # Counting LED OR
         ledor_count = np.sum(df['trial_type'] == 'LED OR')
 
-        # ******************************
-        # IF 200 LED OR: take them all
-        # ******************************
-        if ledor_count == 200:
-            print(event_path)
-
-            # Select sample to crop data
-            idx_start = np.where([df['trial_type'] == 'LED OR'])[1][0]
-            sample_start = df['sample'].iloc[idx_start]
-            print(f"idx_start: {idx_start}")
-            print(f"sample_start: {sample_start}")
-            idx_stop = np.where([df['trial_type'] == 'LED OR'])[1][-1]
-            sample_stop = df['sample'].iloc[idx_stop]
-            print(f"idx_start: {idx_stop}")
-            print(f"sample_start: {sample_stop}")
-            sample_start = sample_start - 3 * srate_in
-            sample_stop = sample_stop + 3 * srate_in
-
-        # ***********************************************************
-        # IF > 200 LED OR: take the last 200.
-        # Crop data referring to the first valid LED OR
-        # ***********************************************************
-
-        if ledor_count != 200:
-            print(event_path)
-
-            # Select sample to crop data
-            idx_ledor = np.where([df['trial_type'] == 'LED OR'])[1][-200:]
-            idx_start = idx_ledor[0]
-            sample_start = df['sample'].iloc[idx_start]
-            print(f"idx_start: {idx_start}")
-            print(f"sample_start: {sample_start}")
-            idx_stop = np.where([df['trial_type'] == 'LED OR'])[1][-1]
-            sample_stop = df['sample'].iloc[idx_stop]
-            print(f"idx_stop: {idx_stop}")
-            print(f"sample_stop: {sample_stop}")
-            sample_start = sample_start - 3 * srate_in
-            sample_stop = sample_stop + 3 * srate_in
+        # Taking last 200 LEDOR
+        idx_ledor = np.where([df['trial_type'] == 'LED OR'])[1][-200:]
+        idx_start = idx_ledor[0]
+        idx_stop = idx_ledor[-1]
+        sample_start = df['sample'].iloc[idx_start]
+        sample_stop = df['sample'].iloc[idx_stop]
+        sample_start = sample_start - 3 * srate_in
+        sample_stop = sample_stop + 3 * srate_in
 
         # Add run length
         runs_length[i] = sample_stop - sample_start
@@ -244,10 +216,10 @@ for sbj_path in sbj_paths:
         montage = mne.channels.make_standard_montage('biosemi64')
         raw.set_montage(montage)
 
-        # Filter & detrend data (LP, HP)
-        data_ = filtfilt(b_lp, a_lp, data_)
-        data_ = filtfilt(b_hp, a_hp, data_)
-        data = detrend(data_)
+        # Detrend and Filter data (LP, HP)
+        data = detrend(data)
+        data = filtfilt(b_lp, a_lp, data)
+        data = filtfilt(b_hp, a_hp, data)
 
         # Crop data
         data = data[:, sample_start:sample_stop]
@@ -260,15 +232,8 @@ for sbj_path in sbj_paths:
         bad_idx_by_ransac, channel_correlations, bad_window_fractions = NC.find_bad_by_ransac(n_samples=100)
         bad_channels_.append(bad_idx_by_ransac)
 
-    # Make a list containing all the single bad channel for each subject
-    path = os.path.join(sbj_path, 'data_preproc3', 'bad_channels')
-    if not os.path.exists(path):
-        os.makedirs(path)
-    print(f"bad_channels_: {bad_channels_}")
+    # Unique bad channels
     bad_channels = np.unique(np.concatenate(bad_channels_))
-    print(f"bad_channels: {bad_channels}")
-    save_path = os.path.join(path, 'bad_channels.txt')
-    np.savetxt(save_path, bad_channels, fmt='%s')
 
     # np array of concatenated data
     conc_data = np.concatenate(conc_data_, axis=-1)
@@ -280,39 +245,54 @@ for sbj_path in sbj_paths:
 
     # dict with concatenated (filtered, detrended and cropped) data and their length
     m_dict = dict()
-    m_dict['conc_runs'] = conc_data
     m_dict['raw_conc_runs'] = raw_conc
     m_dict['runs_length'] = runs_length
 
-    save_path = os.path.join(sbj_path, 'data_preproc3', 'preprocessing', '01.filtering')
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
-    with open(os.path.join(save_path, 'conc_filt.pkl'), 'wb') as handle:
-        pickle.dump(m_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-    # Upload bad channel to raw
-    bad_file_path = os.path.join(path, 'bad_channels.txt')
-    raw_conc.load_bad_channels(bad_file=bad_file_path)
+    # Upload bad channel to raw (as a list, numpy array not accepted)
+    raw_conc.info['bads'] = bad_channels.tolist()
 
     # Make ICA on single sub concatenated runs
     ica = ICA(random_state=23)
     ica.fit(raw_conc)
 
-    save_path = os.path.join(sbj_path, 'data_preproc3', 'preprocessing', '02.ICA')
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
-    ica.save(os.path.join(save_path, sbj_path[-7:] + '_ses-01_ica.fif'), overwrite=True)
-
     # Take single components
     components = ica.get_sources(raw_conc)
     ica_datas = components.get_data()
-    save_path = os.path.join(sbj_path, 'data_preproc3', 'preprocessing', '02.ICA')
 
+    ###########################################
+    # Make some savings
+    ###########################################
+
+    # Path to save this script data
+    path_ = os.path.join(root_folder, 'data', 'preprocessing')
+
+    # Easy logic to define subject_id (e.g.: sub-001 ... sub-101)
+    experiment = sbj_path.split(sep='/')[-2]
+    if experiment[-1] == '0':
+        sub_id = sbj_path[-7:]
+    if experiment[-1] == '1':
+        sub_id = sbj_path[-7:-3] + '1' + sbj_path[-2:]
+
+    # Saving IC components images and ica object
+    save_path = os.path.join(path_, 'ICA', sub_id)
+    create_path(path=save_path)
+    ica.save(os.path.join(save_path, sub_id + '_ses-01_ica.fif'), overwrite=True)
     for i, ica_data in enumerate(ica_datas):
         psd, sfreq = mne.time_frequency.psd_array_welch(x=ica_data, fmax=60, n_per_seg=5 * srate_in,
                                                         n_fft=5 * srate_in * 2,
                                                         n_overlap=int(5 * srate_in / 2),
                                                         sfreq=512)
         subplot_ica(ica, ica_data, sfreq, psd, srate_in, time_duration=100, i=i, fpath=save_path)
-
     create_probab_df(raw=raw_conc, ica=ica, fpath=save_path)
+
+    # Save preprocessed concatenated data
+    save_path = os.path.join(path_, '01.filtering')
+    create_path(path=save_path)
+    with open(os.path.join(save_path, sub_id + '_ses-01_conc_filt.pkl'), 'wb') as handle:
+        pickle.dump(m_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    # Saving bad channels
+    save_path = os.path.join(path_, 'bad_channels')
+    create_path(path=save_path)
+    save_path = os.path.join(save_path, sub_id + '_bad_channels.txt')
+    np.savetxt(save_path, bad_channels, fmt='%s')
