@@ -1,3 +1,12 @@
+"""
+* Read raw concatenated files, ICA mixing/unmixing matrices, bad_channels and manually labelled bad IC components
+* Apply ICA without bad components
+* Interpolate bad channels
+* Set new EEG reference (without apply)
+* Split in single runs and save
+"""
+
+
 import os
 import glob
 import mne
@@ -15,6 +24,7 @@ def create_path(path):
     """
     if not os.path.exists(path):
         os.makedirs(path)
+
 
 """
 SCRIPT STARTS HERE
@@ -63,10 +73,6 @@ for bad_ch_path, file_path, ica_sub_folder in zip(bad_ch_paths[:1], data_paths[:
     data = raw_processed.get_data()
     ch_names = raw_processed.info.ch_names
 
-    # Save processed data
-    save_path = os.path.join(root_path, 'preproc_runs')
-    create_path(path=save_path)
-
     # *****************************
     # Split in single runs
     # *****************************
@@ -90,7 +96,9 @@ for bad_ch_path, file_path, ica_sub_folder in zip(bad_ch_paths[:1], data_paths[:
 
         run = data[:, inizio:fine]
 
-        # Saving
+        # Save processed data
+        save_path = os.path.join(root_path, 'preproc_runs')
+        create_path(path=save_path)
         m_dict = dict()
         m_dict['data'] = run
         m_dict['info'] = info
