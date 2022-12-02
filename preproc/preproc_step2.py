@@ -16,7 +16,9 @@ def create_path(path):
     if not os.path.exists(path):
         os.makedirs(path)
 
-
+"""
+SCRIPT STARTS HERE
+"""
 root_path = '/Users/federico/University/Magistrale/00.TESI/data_original/data/preprocessing'
 data_folder = os.path.join(root_path, '01.filtering')
 bad_ch_folder = os.path.join(root_path, 'bad_channels')
