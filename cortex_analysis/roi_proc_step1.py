@@ -9,6 +9,7 @@ is representative for the selected ROI.
 * mean,     [-1, 4]
 * pca_bst,  [-1, 2]
 * pca_sk,   [-1, 2]
+* mean_pca, [-1, 4]
 
 """
 
@@ -108,7 +109,7 @@ def scouting(data_, mode_):
     :return: single time series, representative of the ROI
     """
 
-    valid_modes = ['mean', 'pca_sk', 'pca_bst']
+    valid_modes = ['mean', 'mean_pca', 'pca_sk', 'pca_bst']
     if mode_ not in valid_modes:
         raise ValueError(f"Invalid mode. valid modes are: {valid_modes}")
 
@@ -116,6 +117,14 @@ def scouting(data_, mode_):
         # Mean in time between all channels
         data_ = data_.reshape(data_.shape[0] * data_.shape[1], data_.shape[2])
         f_new_ = np.mean(data_, axis=0)
+
+    if mode_ == 'mean_pca':
+        pca = PCA(n_components=1, svd_solver='arpack')
+        # Mean between three direction. Input is Nx3xT, output is 3xT
+        data_ = np.mean(data_, axis=0)
+        data_ = np.transpose(data_)
+        data_ = pca.fit_transform(data_)
+        f_new_ = np.transpose(data_)[0, :]
 
     elif mode_ == 'pca_sk':
         # PCA between the Nx3 components
@@ -227,7 +236,7 @@ print("{:40} {}".format("srate", srate))
 # This is a function: y=(x+1), where x=t and y=t_out
 
 
-for sbj_f_path in sbj_paths[11:]:
+for sbj_f_path in sbj_paths:
 
     print('=======================================================================================')
     print(sbj_f_path)
