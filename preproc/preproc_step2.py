@@ -39,7 +39,7 @@ bad_ch_paths = sorted(bad_ch_paths)
 ica_sub_folders = glob.glob(os.path.join(root_path, 'ICA', 'sub*'))
 ica_sub_folders = sorted(ica_sub_folders)
 
-for bad_ch_path, file_path, ica_sub_folder in zip(bad_ch_paths[:1], data_paths[:1], ica_sub_folders[:1]):
+for bad_ch_path, file_path, ica_sub_folder in zip(bad_ch_paths, data_paths, ica_sub_folders):
     with open(file_path, 'rb') as f:
         m_dict = pickle.load(f)
 
@@ -76,7 +76,7 @@ for bad_ch_path, file_path, ica_sub_folder in zip(bad_ch_paths[:1], data_paths[:
     # *****************************
     # Split in single runs
     # *****************************
-    # Carico la lunghezza delle run
+    # Load run length
     runs_length = m_dict['runs_length']
     runs_length = runs_length.astype(int)
     run = []
@@ -97,14 +97,15 @@ for bad_ch_path, file_path, ica_sub_folder in zip(bad_ch_paths[:1], data_paths[:
         run = data[:, inizio:fine]
 
         # Save processed data
-        save_path = os.path.join(root_path, 'preproc_runs')
+        sub_name = ica_sub_folder.split(sep='/')[-1]
+        run_name = '_ses-01_run' + str(j + 1) + '.pkl'
+
+        save_path = os.path.join(root_path, 'preproc_runs', sub_name)
         create_path(path=save_path)
         m_dict = dict()
         m_dict['data'] = run
         m_dict['info'] = info
 
-        sub_name = ica_sub_folder.split(sep='/')[-2]
-        run_name = '_ses-01_run' + str(j + 1) + '.pkl'
 
         with open(os.path.join(save_path, sub_name + run_name), 'wb') as handle:
             pickle.dump(m_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
