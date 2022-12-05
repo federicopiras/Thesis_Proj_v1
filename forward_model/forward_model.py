@@ -32,12 +32,12 @@ mne.viz.plot_alignment(info, src=src,
 fwd = mne.make_forward_solution(info, trans=trans, src=src,
                                 bem=bem, eeg=True, mindist=5.0, n_jobs=1)
 
-# # Save the forward model to folder path
-# save_path = os.path.join('/Users/federico/University/Magistrale/00.TESI/data_original/experiment0/common_data',
-#                          'forward_model', 'biosemi', 'experiment0-fwd.fif')
-# mne.write_forward_solution(save_path, fwd, overwrite=True, verbose=True)
-#
-# # Try to read the forward model
-# load_path = os.path.join('/Users/federico/University/Magistrale/00.TESI/data_original/experiment0/common_data',
-#                          'forward_model', 'biosemi', 'experiment0-fwd.fif')
-# fwd = mne.read_forward_solution(load_path)
+# Save the forward model to folder path
+save_path = os.path.join('/Users/federico/University/Magistrale/00.TESI/data_original/experiment0/common_data',
+                         'forward_model', 'biosemi', 'experiment0-fwd.fif')
+mne.write_forward_solution(save_path, fwd, overwrite=True, verbose=True)
+
+# Try to read the forward model
+load_path = os.path.join('/Users/federico/University/Magistrale/00.TESI/data_original/experiment0/common_data',
+                         'forward_model', 'biosemi', 'experiment0-fwd.fif')
+fwd = mne.read_forward_solution(load_path)
