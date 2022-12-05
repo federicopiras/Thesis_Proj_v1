@@ -52,18 +52,20 @@ sbj_paths = sorted(sbj_paths)
 # post_time --> secondi successivi al CUE
 # pre --> campioni antecedenti all'epoca
 # post --> campioni successivi all'epoca
+# bline_ival --> intervallo baseline prima di CUE FORWARD
 srate = 512
-pre_time = -1
+pre_time = -1.5
 post_time = 4
 sec = np.abs(pre_time) + np.abs(post_time)  # 5
-pre = pre_time * srate
-post = post_time * srate
+pre = int(pre_time * srate)
+post = int(post_time * srate)
+bline_ival = [-1.5, -0.25]
 
 # For each subject:
 #     Load preproc_runs
 #     Load raw .csv
 #     Load targets .csv
-for sbj_path, run_folder in zip(sbj_paths[:1], run_folders[:1]):
+for sbj_path, run_folder in zip(sbj_paths, run_folders):
 
     # list of .csv events file names:
     csv_paths = sorted(glob.glob(os.path.join(sbj_path, 'ses-01',
@@ -88,7 +90,7 @@ for sbj_path, run_folder in zip(sbj_paths[:1], run_folders[:1]):
     baseline_matrix = []
     sub_dict = dict()
 
-    for csv_path, run_path, sequence_path in zip(csv_paths, run_paths, sequence_paths):
+    for csv_path, run_path, sequence_path in zip(csv_paths[:1], run_paths[:1], sequence_paths[:1]):
         print(csv_path)
         print(run_path)
 
@@ -124,13 +126,14 @@ for sbj_path, run_folder in zip(sbj_paths[:1], run_folders[:1]):
         targets = np.array(targets[0].tolist())
 
         # Allocate array for epochs
-        epochs = np.zeros((sample_cue.shape[0], data.shape[0], sec * srate))
+        epochs = np.zeros((sample_cue.shape[0], data.shape[0], int(sec * srate)))
         for j, sample in enumerate(sample_cue):
             start = sample + pre # that works both for positive and negative pre
             stop = sample + post
             epoch_ = data[:, start:stop]
-            start_bline = sample - 512
-            baseline_ = data[:, start_bline:sample]
+            start_bline = sample + int(bline_ival[0]*srate)
+            stop_bline = sample + int(bline_ival[1]*srate)
+            baseline_ = data[:, start_bline:stop_bline]
             baseline = np.mean(baseline_, axis=1).reshape(data.shape[0], 1)
             epoch = epoch_ - baseline
             epochs[j, :, :] = epoch
@@ -152,11 +155,11 @@ for sbj_path, run_folder in zip(sbj_paths[:1], run_folders[:1]):
 
     # Save dictionary with useful data
     sub_dict['baseline'] = np.array(baseline_matrix)
-    sub_dict['baseline_ival'] = [-1, 0]
+    sub_dict['baseline_ival'] = bline_ival
     sub_dict['ch_names'] = info['ch_names']
     sub_dict['epochs'] = sub_epochs
     sub_dict['info'] = info
-    sub_dict['ival'] = [-1, 4]
+    sub_dict['ival'] = [pre_time, post_time]
     sub_dict['srate'] = srate
     sub_dict['run_labels'] = run_labels
     sub_dict['targets'] = sub_targets
@@ -165,7 +168,8 @@ for sbj_path, run_folder in zip(sbj_paths[:1], run_folders[:1]):
     save_path = os.path.join(root_path, 'datasets', 'scalp1')
     create_path(save_path)
     file_name = run_path.split(sep='/')[-1]
-    with open(os.path.join(save_path, file_name), 'wb') as handle:
+    file_name = [item for item in file_name.split(sep='_') if 'sub' in item][0]
+    with open(os.path.join(save_path, file_name + '_ses-01_eeg.pkl'), 'wb') as handle:
         pickle.dump(sub_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
     # epoch_folder_name = f'epoched_-{pre_time}-{post_time}_' + direction + '_' + all_or_valid
     # relative_path = os.path.join('data_preproc3', 'processing', epoch_folder_name)
