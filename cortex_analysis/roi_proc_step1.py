@@ -252,7 +252,6 @@ def scouting(data_, mode_, src_=None, label_=None):
             w_data_ = data_ * weights
             f_new_ = np.sum(w_data_, axis=0) / np.sum(weights)
 
-
     return f_new_
 
 
