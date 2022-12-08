@@ -167,19 +167,22 @@ def scouting(data_, mode_, src_=None, label_=None):
         Options:
         * mean
             Returns a single time series, that is the mean of all the time series in a ROI.
+        * mean_flip
+            First compute the main direction of the dipoles in the ROI. Then fips the sign of all the dipole series
+            which direction is opposite to the main direction. Lastly, apply the mean between all series.
+            src_ and label_ must not be None if you choose this method.
         * mean_pca
             First compute the mean between the 3 directions --> (3, T). At this point, apply PCA to
             aggregate the 3 series in a single time series. Data must be 3D.
+        * mean_sep
+            First compute the mean between the 3 directions --> (3, T). Then saves the (NROI, 3, T) vector.
+            Data must be (NVox, 3, T)
         * pca_sk
             Apply PCA among all the time series in the ROI. Returns a single series representative of the ROI.
             Data can be both 2D or 3D.
         * pca_bst
             Self implemented PCA (it implements the flip_sign too). Apply PCA among all the time series in the ROI.
             Returns a single series representative of the ROI. Data can be both 2D or 3D.
-        * mean_flip
-            First compute the main direction of the dipoles in the ROI. Then fips the sign of all the dipole series
-            which direction is opposite to the main direction. Lastly, apply the mean between all series.
-            src_ and label_ must not be None if you choose this method.
         * weight_mean
             Weighted mean of the time series. First compute the norm of the data along the time direction, that is
             here considered as the weight of the time series. Multiply each time series for its norm. Sum all the
@@ -195,11 +198,11 @@ def scouting(data_, mode_, src_=None, label_=None):
         Single time series representative of the ROI
     """
 
-    valid_modes = ['mean', 'mean_pca', 'pca_sk', 'pca_bst', 'mean_flip', 'weight_mean']
+    valid_modes = ['mean', 'mean_flip', 'mean_pca', 'mean_sep', 'pca_sk', 'pca_bst', 'weight_mean']
     if mode_ not in valid_modes:
         raise ValueError(f"Invalid mode. valid modes are: {valid_modes}")
 
-    if (data_.ndim == 3) and ((mode_ != 'mean_pca') and (mode_ != 'weight_mean')):
+    if (data_.ndim == 3) and (mode_ != 'mean_pca') and (mode_ != 'weight_mean') and (mode_ != 'mean_sep'):
         data_ = data_.reshape(data_.shape[0] * data_.shape[1], data_.shape[2])
 
     if mode_ == 'mean':
@@ -224,6 +227,11 @@ def scouting(data_, mode_, src_=None, label_=None):
         data_ = np.transpose(data_)
         data_ = pca.fit_transform(data_)
         f_new_ = np.transpose(data_)[0, :]
+
+    elif mode == 'mean_sep':
+        if data_.ndim == 2:
+            raise ValueError(f'data must be (Nvox, 3, T). Your data dimension is: {data_.shape}')
+        f_new_ = np.mean(data_, axis=0)
 
     elif mode_ == 'pca_sk':
         # PCA between the Nx3 components
@@ -336,7 +344,7 @@ pick_ori = 'vector'  # 'normal',  # None
 srate = 512
 
 # Scouting function
-mode = 'weight_mean'  # mean, pca, mean_pca, pca_bst
+mode = 'mean_sep'  # mean, pca, mean_pca, pca_bst
 
 # Interval
 ival = [-1.5, 4]
@@ -391,8 +399,19 @@ for epoch_path in epoch_paths:
                                              verbose=False)
 
     # Allocate array for reconstruction
-    tcs = np.zeros(shape=(run_labels.shape[0], len(labels), int(srate * (np.abs(ival[0]) + np.abs(ival[1])))))
+    if mode != 'mean_sep':
+        tcs = np.zeros(shape=(run_labels.shape[0],
+                              len(labels),
+                              int(srate * (np.abs(ival[0]) + np.abs(ival[1]))))
+                       )
+    else:
+        tcs = np.zeros(shape=(run_labels.shape[0],
+                              len(labels),
+                              3,
+                              int(srate * (np.abs(ival[0]) + np.abs(ival[1]))))
+                       )
 
+    # Inversion and scouting
     for i in np.arange(len(epochs)):
         epoch = epochs[i]
         # Down-sample logic
@@ -430,7 +449,7 @@ for epoch_path in epoch_paths:
             #                                       src=inverse_operator['src'],
             #                                       mode=mode,
             #                                       verbose=False)[0][0]
-            tcs[i, j, :] = f_new
+            tcs[i, j, ...] = f_new
 
         elapsed = time.time() - t
         print(f'Elapsed time for trial #{i % 50 + 1} = {elapsed} seconds')
