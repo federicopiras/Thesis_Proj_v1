@@ -15,6 +15,7 @@ from scipy.signal import filtfilt, ellip, ellipord
 import pickle
 import os
 import glob
+from matplotlib.ticker import MultipleLocator
 
 valid_modes = ['mean', 'pca_bst', 'pca_sk']
 mode = 'pca_sk'
@@ -22,7 +23,7 @@ if mode not in valid_modes:
     raise ValueError(f"invalid mode for mode={mode}. mode should be one in {valid_modes}")
 
 # Pick up sub epochs
-# Relative path may differ
+# Relative path may differ: this is the path where the dataset folder containing the .pkl files is located
 relative_path = '/Users/federico/University/Magistrale/00.TESI/data_original/datasets/cortex'
 folder_path = glob.glob(os.path.join(relative_path, mode + '*'))[0]
 plot_path = os.path.join(folder_path, 'plot')
@@ -39,7 +40,7 @@ file_paths = sorted(file_paths)
 all_epochs_ = []
 all_targets = []
 
-for file_path in file_paths:
+for file_path in file_paths[:1]:
     with open(file_path, 'rb') as f:
         dict_ = pickle.load(f)
     epochs = dict_['epochs']
@@ -51,7 +52,6 @@ for file_path in file_paths:
     srate = dict_['srate']
     all_epochs_.append(epochs)
     all_targets.append(targets)
-roi_names = roi_info['roi_names'].tolist()
 
 all_epochs_ = np.concatenate(all_epochs_, axis=0)
 all_targets = np.concatenate(all_targets)
@@ -79,9 +79,9 @@ b_hp, a_hp = ellip(ord, gpass, gstop, wn, btype='high')
 for j, epoch in enumerate(all_epochs_):
     epoch = filtfilt(b_lp, a_lp, epoch)
     epoch = filtfilt(b_hp, a_hp, epoch)
-    baseline = np.mean(epoch[:, :512], axis=-1)
-    baseline = baseline.reshape(all_epochs_.shape[1], 1)
-    all_epochs_[j, :, :] = epoch - baseline
+    # baseline = np.mean(epoch[:, :512], axis=-1)
+    # baseline = baseline.reshape(all_epochs_.shape[1], 1)
+    all_epochs_[j, :, :] = epoch #- baseline
 
 # Grand Average
 grand_average = np.zeros(shape=(5, np.shape(all_epochs_)[1], np.shape(all_epochs_)[-1]))
@@ -100,11 +100,15 @@ fmax = fmax + 0.25 * fmax
 print(f"MAX grand_average: {fmax}")
 print(f"MIN grand_average: {fmin}")
 
-
-# Plotting left hemisphere
+# Some useful parameters
+roi_names = roi_info['roi_names'].tolist()
 pre_time = ival[0]
 post_time = ival[1]
 t = np.linspace(pre_time, post_time, epochs.shape[-1])
+
+# --------------------------
+# Plotting left hemisphere
+# --------------------------
 left_roi_names = [left_roi_name for left_roi_name in roi_names if 'lh' in left_roi_name[-2:]]
 
 fig, axs = plt.subplots(nrows=6, ncols=6, figsize=(30, 30))
@@ -134,13 +138,12 @@ fig.delaxes(axs[-1, -1])
 fig.delaxes(axs[-1, -2])
 fig.tight_layout()
 fig.show()
-fig.savefig(os.path.join(plot_path, 'roi_lh.pdf'))
+# fig.savefig(os.path.join(plot_path, 'roi_lh.pdf'))
 
+# --------------------------
 # Plotting right hemisphere
-pre_time = ival[0]
-post_time = ival[1]
-t = np.linspace(pre_time, post_time, epochs.shape[-1])
-left_roi_names = [left_roi_name for left_roi_name in roi_names if 'rh' in left_roi_name[-2:]]
+# --------------------------
+right_roi_names = [right_roi_name for right_roi_name in roi_names if 'rh' in right_roi_name[-2:]]
 
 fig, axs = plt.subplots(nrows=6, ncols=6, figsize=(30, 30))
 fig.suptitle('ROI LH', fontsize=20, fontweight='bold')
@@ -170,4 +173,78 @@ fig.delaxes(axs[-1, -1])
 fig.delaxes(axs[-1, -2])
 fig.tight_layout()
 fig.show()
-fig.savefig(os.path.join(plot_path, 'roi_rh.pdf'))
+#fig.savefig(os.path.join(plot_path, 'roi_rh.pdf'))
+
+# ---------------------------------------------------------------------------------------
+# Plot signal of same lh and rh ROI in a (1, 2) subplot: (1,1)-->time series of left roi
+#                                                        (1,2)-->time series of right ROI
+# ---------------------------------------------------------------------------------------
+
+# Need a df to use the lambda x
+roi_names = roi_info['roi_names']
+# Take just the ROI name (without the final lh-rh)
+x = lambda x: x[:-3]
+roi_names_ = roi_names.apply(x)
+# Take unique roi names
+roi_names_ = roi_names_.tolist()
+unique_roi_names = np.unique(roi_names_).tolist()
+
+
+# Dichiaro le ROI_names:
+for roi in unique_roi_names:
+
+    # Take lh ROI index
+    lh_idx = np.where([roi in roi_name for roi_name in roi_names])[0][0]
+    # Take rh ROI index
+    rh_idx = np.where([roi in roi_name for roi_name in roi_names])[0][1]
+
+    # Create figure
+    fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(22, 4))
+    # Plot lh ROI in the left subplot and rh ROI in the right subplot
+    for led in range(grand_average.shape[0]):
+        axs[0].plot(t, grand_average[led, lh_idx, :], label='LED' + str(led + 1))
+        axs[1].plot(t, grand_average[led, rh_idx, :], label='LED' + str(led + 1))
+
+    # Aggiungo titolo, label, griglia, ylim ai singoli subplots
+    axs[0].set_title(roi_names[lh_idx])
+    axs[0].set_ylim([fmin, fmax])
+    axs[0].set_xlim([t[0], t[-1]])
+    axs[0].set_ylabel('pA*m')
+    axs[0].set_xlabel('time [s]')
+    axs[0].legend()
+    axs[0].xaxis.set_major_locator(MultipleLocator(1))
+    axs[0].get_xticklabels()[2].set_color('red')
+    axs[0].get_xticklabels()[4].set_color('red')
+    axs[0].xaxis.set_minor_locator(MultipleLocator(0.25))
+    axs[0].grid(which='major')
+    axs[0].grid(which='minor', linestyle='--', alpha=0.5)
+
+    axs[1].set_title(roi_names[rh_idx])
+    axs[1].set_ylim([fmin, fmax])
+    axs[1].set_xlim([t[0], t[-1]])
+    axs[1].set_ylabel('pA*m')
+    axs[1].set_xlabel('time [s]')
+    axs[1].legend()
+    axs[1].xaxis.set_major_locator(MultipleLocator(1))
+    axs[1].get_xticklabels()[2].set_color('red')
+    axs[1].get_xticklabels()[4].set_color('red')
+    axs[1].xaxis.set_minor_locator(MultipleLocator(0.25))
+    axs[1].grid(which='major')
+    axs[1].grid(which='minor', linestyle='--', alpha=0.5)
+
+    # Aggiungo vertical lines
+    axs[0].vlines(t[511], ymin=fmin, ymax=fmax, linestyles='-', linewidth=2, color='k')
+    axs[0].vlines(t[1535], ymin=fmin, ymax=fmax, linestyles='-', linewidth=2, color='k')
+    axs[1].vlines(t[511], ymin=fmin, ymax=fmax, linestyles='-', linewidth=2, color='k')
+    axs[1].vlines(t[1535], ymin=fmin, ymax=fmax, linestyles='-', linewidth=2, color='k')
+
+    ## Cambio colore ai ticks che mi interessano
+    # axs[0].get_xticklabels()[1].set_color('red')
+    # axs[0].get_xticklabels()[3].set_color('red')
+    # axs[1].get_xticklabels()[1].set_color('red')
+    # axs[1].get_xticklabels()[3].set_color('red')
+
+    fig.show()
+    # if not os.path.exists(save_path):
+    #    os.makedirs(save_path)
+    # fig.savefig(os.path.join(save_path, roi_names[lh_idx][:-3] + '.pdf'))
