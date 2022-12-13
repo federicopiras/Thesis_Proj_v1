@@ -19,15 +19,177 @@ class GrandAverage:
 
     """
 
-    def __init__(self, grand_average_, kind_, divide_by_led_):
+    def __init__(self, grand_average_, kind_, divide_by_led_, dict_, sub_id):
         self.grand_average_ = grand_average_
         self.kind_ = kind_
         self.divide_by_led_ = divide_by_led_
+        self.sub_id = sub_id
+        for key, value in dict_.items():
+            if key != ('epochs' or 'targets'):
+                setattr(self, key, value)
+
+    def get_min_max(self):
+        fmin = np.min(self.grand_average_)
+        fmax = np.max(self.grand_average_)
+        return fmin, fmax
+
+    def get_pre_post(self):
+        pre_, post_ = self.ival
+        return pre_, post_
 
     def view_in_time(self):
-        if self.kind == 'total' and self.divide_by_led_:
-            pass
-        pass
+        fmin, fmax = self.get_min_max()
+        fmin = (fmin + 0.25 * fmin) * 1e6
+        fmax = (fmax + 0.25 * fmax) * 1e6
+        pre_, post_ = self.get_pre_post()
+        nsample = int((np.abs(pre) + np.abs(post)) * self.srate)
+        time = np.linspace(pre_, post_, nsample)
+
+        if self.kind_ == 'total' and self.divide_by_led_:
+            for ch_ in self.ch_names:
+                fig, ax = plt.subplots(1, 1, figsize=(10, 5))
+                for led in range(self.grand_average_.shape[0]):
+                    ax.plot(time, self.grand_average_[led, self.ch_names.index(ch_)] * 1e6,
+                            label='LED'+str(led+1), linewidth=1)
+                ax.set_title(ch_, fontsize=20)
+                ax.legend()
+                ax.set_xlim([pre_, post_])
+                ax.set_ylim([fmin, fmax])
+                ax.set_xlabel('time [s]', fontsize=15)
+                ax.set_ylabel('µV', fontsize=15)
+
+                ax.vlines(time[int(self.srate * np.abs(pre_))],
+                          ymin=fmin, ymax=fmax,
+                          linestyles='-', linewidth=1.8, color='k')
+                ax.vlines(time[int(self.srate * np.abs(pre_) + 2)],
+                          ymin=fmin, ymax=fmax,
+                          linestyles='-', linewidth=1.8, color='k')
+                ax.hlines(y=0,
+                          xmin=pre_, xmax=post_,
+                          linestyles='--', linewidth=2, color='gray', alpha=0.4)
+
+                # Cambio colore ai ticks che mi interessano
+                ax = plt.gca()
+                ax.xaxis.set_major_locator(MultipleLocator(0.5))
+                ax.get_xticklabels()[3].set_color('red')
+                ax.get_xticklabels()[7].set_color('red')
+                ax.xaxis.set_minor_locator(MultipleLocator(0.25))
+                ax.yaxis.set_minor_locator(MultipleLocator(1))
+                ax.tick_params(axis='both', which='major', labelsize=15)
+                ax.grid(which='major', linestyle='-', alpha=0.4)
+                ax.grid(which='minor', linestyle='--', alpha=0.2)
+                fig.show()
+
+        elif self.kind_ == 'total' and not self.divide_by_led_:
+            for ch_ in self.ch_names:
+                fig, ax = plt.subplots(1, 1, figsize=(10, 5))
+                ax.plot(time, self.grand_average_[self.ch_names.index(ch_)] * 1e6,
+                        linewidth=1)
+                ax.set_title(ch_, fontsize=20)
+                ax.set_xlim([pre_, post_])
+                ax.set_ylim([fmin, fmax])
+                ax.set_xlabel('time [s]', fontsize=15)
+                ax.set_ylabel('µV', fontsize=15)
+
+                ax.vlines(time[int(self.srate * np.abs(pre_))],
+                          ymin=fmin, ymax=fmax,
+                          linestyles='-', linewidth=1.8, color='k')
+                ax.vlines(time[int(self.srate * np.abs(pre_) + 2*self.srate)],
+                          ymin=fmin, ymax=fmax,
+                          linestyles='-', linewidth=1.8, color='k')
+                ax.hlines(y=0,
+                          xmin=pre_, xmax=post_,
+                          linestyles='--', linewidth=2, color='gray', alpha=0.4)
+
+                # Cambio colore ai ticks che mi interessano
+                ax = plt.gca()
+                ax.xaxis.set_major_locator(MultipleLocator(0.5))
+                ax.get_xticklabels()[3].set_color('red')
+                ax.get_xticklabels()[7].set_color('red')
+                ax.xaxis.set_minor_locator(MultipleLocator(0.25))
+                ax.yaxis.set_minor_locator(MultipleLocator(1))
+                ax.tick_params(axis='both', which='major', labelsize=15)
+                ax.grid(which='major', linestyle='-', alpha=0.4)
+                ax.grid(which='minor', linestyle='--', alpha=0.2)
+                fig.show()
+
+        elif self.kind_ == 'ws' and self.divide_by_led_:
+            if self.sub_id is None:
+                raise Exception('sub id must not be None when performing within sub avg')
+            for k, subject_average in enumerate(self.grand_average_):
+                fig, axs = plt.subplots(nrows=10, ncols=6, sharex=True, sharey=True, figsize=(20, 10))
+                fig.suptitle(self.sub_id[k])
+                for ch_, ax in zip(self.ch_names, axs.ravel()):
+                    for led in range(subject_average.shape[0]):
+                        ax.plot(time, subject_average[led, self.ch_names.index(ch_)] * 1e6,
+                                linewidth=1, label='LED'+str(led))
+                    ax.set_title(ch_)
+                    ax.legend()
+                    ax.set_xlim([pre_, post_])
+                    ax.set_ylim([fmin, fmax])
+                    ax.set_xlabel('time [s]')
+                    ax.set_ylabel('µV')
+
+                    ax.vlines(time[int(self.srate * np.abs(pre_))],
+                              ymin=fmin, ymax=fmax,
+                              linestyles='-', linewidth=1.8, color='k')
+                    ax.vlines(time[int(self.srate * np.abs(pre_) + 2*self.srate)],
+                              ymin=fmin, ymax=fmax,
+                              linestyles='-', linewidth=1.8, color='k')
+                    ax.hlines(y=0,
+                              xmin=pre_, xmax=post_,
+                              linestyles='--', linewidth=2, color='gray', alpha=0.4)
+
+                    # Cambio colore ai ticks che mi interessano
+                    ax = plt.gca()
+                    ax.xaxis.set_major_locator(MultipleLocator(0.5))
+                    ax.get_xticklabels()[3].set_color('red')
+                    ax.get_xticklabels()[7].set_color('red')
+                    ax.xaxis.set_minor_locator(MultipleLocator(0.25))
+                    ax.yaxis.set_minor_locator(MultipleLocator(1))
+                    ax.tick_params(axis='both', which='major', labelsize=15)
+                    ax.grid(which='major', linestyle='-', alpha=0.4)
+                    ax.grid(which='minor', linestyle='--', alpha=0.2)
+                fig.tight_layout()
+                fig.show()
+
+        elif self.kind_ == 'ws' and not self.divide_by_led_:
+            if self.sub_id is None:
+                raise Exception('sub id must not be None when performing within sub avg')
+            for ch_ in self.ch_names:
+                fig, ax = plt.subplots(nrows=1, ncols=1)
+                for i, subject_average in enumerate(self.grand_average_):
+                    ax.plot(time, subject_average[self.ch_names.index(ch_)] * 1e6,
+                            linewidth=1, label=str(self.sub_id[i]))
+                ax.set_title(ch_, fontsize=20)
+                ax.legend()
+                ax.set_xlim([pre_, post_])
+                ax.set_ylim([fmin, fmax])
+                ax.set_xlabel('time [s]', fontsize=15)
+                ax.set_ylabel('µV', fontsize=15)
+
+                ax.vlines(time[int(self.srate * np.abs(pre_))],
+                          ymin=fmin, ymax=fmax,
+                          linestyles='-', linewidth=1.8, color='k')
+                ax.vlines(time[int(self.srate * np.abs(pre_) + 2*self.srate)],
+                          ymin=fmin, ymax=fmax,
+                          linestyles='-', linewidth=1.8, color='k')
+                ax.hlines(y=0,
+                          xmin=pre_, xmax=post_,
+                          linestyles='--', linewidth=2, color='gray', alpha=0.4)
+
+                # Cambio colore ai ticks che mi interessano
+                ax = plt.gca()
+                ax.xaxis.set_major_locator(MultipleLocator(0.5))
+                ax.get_xticklabels()[3].set_color('red')
+                ax.get_xticklabels()[7].set_color('red')
+                ax.xaxis.set_minor_locator(MultipleLocator(0.25))
+                ax.yaxis.set_minor_locator(MultipleLocator(1))
+                ax.tick_params(axis='both', which='major', labelsize=15)
+                ax.grid(which='major', linestyle='-', alpha=0.4)
+                ax.grid(which='minor', linestyle='--', alpha=0.2)
+                fig.show()
+
 
 class MyEpochs:
     """
@@ -53,15 +215,23 @@ class MyEpochs:
 
     """
 
-    def __init__(self, epochs_, targets_, info_=None, sub_id_=None, ch_names_=None, ival=None, srate=None):
+    # def __init__(self, epochs_, targets_, info_, sub_id_=None, ch_names_=None, ival=None, srate=None):
+    #     self.epochs_ = epochs_
+    #     self.targets_ = targets_
+    #     self.info_ = info_
+    #     self.sub_id_ = sub_id_
+    #     self.ch_names_ = ch_names_
+    #     self.ival = ival
+    #     self.srate = srate
+
+    def __init__(self, epochs_, targets_, dict_):
         self.epochs_ = epochs_
         self.targets_ = targets_
-        self.info_ = info_
-        self.sub_id_ = sub_id_
-        self.ch_names_ = ch_names_
-        self.ival = ival
-        self.srate = srate
-
+        self.dict_ = dict_
+        self.reference = 'A2'
+        for key, value in dict_.items():
+            if key not in ['epochs', 'targets']:
+                setattr(self, key, value)
 
     def apply_car(self, inplace=True):
         """
@@ -71,16 +241,16 @@ class MyEpochs:
         print('--------------------------------------------------------------------')
         print("You are applying the Common Average Reference. Changes occur inplace")
         print('--------------------------------------------------------------------')
-        epochs_object = mne.EpochsArray(self.epochs_, self.info_)
+        epochs_object = mne.EpochsArray(self.epochs_, self.info)
         mne.set_eeg_reference(epochs_object,
                               ref_channels='average',
                               projection=True)
         epochs_object.apply_proj()
+        self.reference = 'CAR'
         if inplace:
             self.epochs_ = epochs_object.get_data()
         else:
-            return MyEpochs(epochs_=self.epochs_, targets_=self.targets_, info_=self.info_, sub_id_=self.sub_id_,
-                            ch_names_=self.ch_names_, ival=self.ival, srate=self.srate)
+            return MyEpochs(epochs_=self.epochs_, targets_=self.targets_, dict_=self.dict_)
 
     def filter_data(self, remove_filtered_baseline=True, baseline_ival=[-1.5, -0.25], inplace=True):
         """
@@ -132,8 +302,7 @@ class MyEpochs:
         if inplace:
             self.epochs_ = epochs_filt
         else:
-            return MyEpochs(epochs_=epochs_filt, targets_=self.targets_, info_=self.info_, sub_id_=self.sub_id_,
-                            ch_names_=self.ch_names_, ival=self.ival, srate=self.srate)
+            return MyEpochs(epochs_=epochs_filt, targets_=self.targets_)
 
     def total_grand_average(self, divide_by_led=False):
         """
@@ -165,7 +334,7 @@ class MyEpochs:
         else:
             grand_average_ = np.mean(self.epochs_, axis=0)
             grand_average_ = np.array(grand_average_)
-        return GrandAverage(grand_average_, kind_='total', divide_by_led_=divide_by_led)
+        return GrandAverage(grand_average_, kind_='total', divide_by_led_=divide_by_led, dict_=self.dict_)
 
     def within_subject_average(self, divide_by_led=False):
         """
@@ -188,37 +357,41 @@ class MyEpochs:
             self.targets_ = np.array(self.targets_)
         if self.epochs_.shape[0] != self.targets_.shape[0]:
             raise Exception('epochs and targets must have the same length')
-        if self.sub_id_ is None:
-            raise Exception('sub_id_ must not be None if you want to perform within subject averaging')
 
         if divide_by_led:
-            ws_average = np.zeros(shape=(np.unique(self.sub_id_).shape[0],
+            ws_average = np.zeros(shape=(self.epochs_length.shape[0],
                                          np.unique(self.targets_).shape[0],
                                          self.epochs_.shape[1],
                                          self.epochs_.shape[-1]))
-            for k, id in enumerate(np.unique(self.sub_id_)):
-                sub_targets = self.targets_[self.sub_id_ == id]
-                sub_epochs = self.epochs_[self.sub_id_ == id, ...]
+            for k, length in enumerate(self.epochs_length):
+                start = int(k*length)
+                stop = int((k+1)*length)
+                sub_targets = self.targets_[start:stop, ...]
+                sub_epochs = self.epochs_[start:stop, ...]
                 for j, u in enumerate(np.unique(sub_targets)):
                     ws_average[k, j, ...] = np.mean(sub_epochs[u == sub_targets, ...], axis=0)
         else:
-            ws_average = np.zeros(shape=(np.unique(self.sub_id_).shape[0],
+            ws_average = np.zeros(shape=(self.epochs_length.shape[0],
                                          self.epochs_.shape[1],
                                          self.epochs_.shape[-1]))
-            for k, id in enumerate(np.unique(self.sub_id_)):
-                ws_average[k, ...] = np.mean(self.epochs_[id == self.sub_id_, ...], axis=0)
-        return GrandAverage(ws_average, kind_='ws', divide_by_led_=divide_by_led)
+            for j, length in enumerate(self.epochs_length):
+                start = int(j*length)
+                stop = int((j+1)*length)
+                ws_average[j, ...] = np.mean(self.epochs_[start:stop, ...], axis=0)
+        return GrandAverage(ws_average, kind_='ws', divide_by_led_=divide_by_led, dict_=self.dict_, sub_id=self.sub_id)
 
-
-def get_sub_id(path):
-    """
-    Takes subject id from path. If file path is sub-002_ses-01_eeg.pkl it returns 001.
-    :param path: path of epochs.pkl file
-    :return: sub_id, int.
-    """
-    sub_id_ = [item for item in path.split(sep='_') if 'sub' in item][0]
-    sub_id_ = [f for f in sub_id_.split(sep='-') if 'sub' not in f][0]
-    return int(sub_id_)
+    def get_sub_id(self, paths):
+        """
+        Takes subject id from path. If file path is sub-002_ses-01_eeg.pkl it returns 001.
+        :param paths: path of epochs.pkl file
+        :return: sub_id, int.
+        """
+        sub_id = []
+        for path in paths:
+            _ = [item for item in path.split(sep='_') if 'sub' in item][0]
+            _ = [f for f in _.split(sep='-') if 'sub' not in f][0]
+            sub_id.append(_)
+        setattr(self, 'sub_id', sub_id)
 
 
 """
@@ -226,13 +399,13 @@ SCRIPT STARTS HERE
 """
 all_epochs = []
 all_targets = []
-sub_id = []
 
 root_path = '/Users/federico/University/Magistrale/00.TESI/data_original/datasets'
 epochs_path = glob.glob(os.path.join(root_path, 'scalp', '*.pkl'))
-epochs_path = sorted(epochs_path)
+epochs_path = sorted(epochs_path)[11:13]
+n_epochs = np.zeros(shape=len(epochs_path))
 
-for epoch_path in epochs_path[11:13]:
+for i, epoch_path in enumerate(epochs_path):
 
     # Pick up pickle epochs file path:
     with open(epoch_path, 'rb') as f:
@@ -244,21 +417,17 @@ for epoch_path in epochs_path[11:13]:
     srate = sub_dict['srate']
     pre, post = sub_dict['ival']
     ch_names = sub_dict['ch_names']
+    n_epochs[i] = sub_dict['run_labels'].shape[0]
 
     all_epochs.append(epochs)
     all_targets.append(targets)
-    sub_id.extend(np.ones(shape=targets.shape[0]).astype(int) * get_sub_id(epoch_path))
 
+sub_dict['epochs_length'] = n_epochs.astype('int')
 all_epochs = np.concatenate(all_epochs)
 all_targets = np.concatenate(all_targets)
-sub_id = np.array(sub_id)
-# CAR
-epochs_array = mne.EpochsArray(all_epochs, info)
-mne.set_eeg_reference(epochs_array, ref_channels='average', projection=True)
-epochs_array.apply_proj()
-all_epochs = epochs_array.get_data()
+
 print(f"all_epochs.shape:  {all_epochs.shape}")
 print(f"all_targets.shape: {all_targets.shape}")
 
-all_epochs = MyEpochs(all_epochs, all_targets)
+all_epochs = MyEpochs(all_epochs, all_targets, sub_dict)
 
